@@ -1,12 +1,62 @@
-# React + Vite
+<!-- Banner or Logo -->
+<p align="center">
+  <img src="./public/logo.svg" alt="SecureVault Logo" width="100"/>
+</p>
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+<h1 align="center"> AI Recipe Creator</h1>
+<p align="center">
+  Create your own recipes with the help of AI.
+  <br>
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 📌 About
+Recipe Creator App is an AI-powered web tool that generates recipe ideas instantly based on the ingredients you provide, using the Google Gemini API for intelligent suggestions.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🚀 Live Demo
+🔗 **[recipe-creator-app.vercel.app](https://recipe-creator-app.vercel.app/)**  
+
+---
+
+## ✨ Features
+- 🥗 **AI-Powered Suggestions** – Get recipes instantly using the Gemini API.  
+- 🛠 **Ingredient-Based Search** – Just type in what you have.  
+- 📱 **Responsive Design** – Works on desktop, tablet, and mobile.  
+- 🎨 **Modern UI** – Built with React + Tailwind CSS.
+
+---
+
+## 🛠️ Tech Stack
+![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)&nbsp; &nbsp;![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)&nbsp; &nbsp;![GeminiApi](./public/gemini-api-icon.svg)&nbsp; &nbsp;![JavaScript](https://img.shields.io/badge/javascript-%23323330.svg?style=for-the-badge&logo=javascript&logoColor=%23F7DF1E)
+---
+
+## 📦 Installation
+1. **Clone the repository**
+    ```bash
+    git clone https://github.com/Nishit-Khatri/Recipe-Creator-App.git
+
+    ```
+2. **Install dependencies**
+    ```bash
+    npm install
+    ```
+3. **Run the development server**
+    ```bash
+    npm run dev
+    ```
+
+---
+
+## 📸 Screenshots
+ Home Page
+
+![Home](./public/Screenshots/Homepage.png)
+
+ Recipe Suggestions  
+
+![Recipes](./public/Screenshots/Recipe%20Suggestions.png)
+
+ 
+---
