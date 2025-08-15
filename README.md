@@ -1,6 +1,6 @@
 <!-- Banner or Logo -->
 <p align="center">
-  <img src="./public/logo.svg" alt="SecureVault Logo" width="100"/>
+  <img src="./public/logo.svg" alt="AI Recipe Creator Logo" width="100"/>
 </p>
 
 <h1 align="center"> AI Recipe Creator</h1>
