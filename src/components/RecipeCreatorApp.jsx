@@ -63,12 +63,14 @@ You must respond with ONLY a valid JSON object in this exact format (no markdown
 
 Make it a realistic, delicious recipe that highlights the provided ingredients. Include common pantry staples with proper measurements. Provide clear, detailed cooking instructions.`;
 
+      // Updated API URL and Header authorization structure
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "X-goog-api-key": apiKey, 
           },
           body: JSON.stringify({
             contents: [
@@ -332,7 +334,7 @@ Make it a realistic, delicious recipe that highlights the provided ingredients. 
               Powered by Google Gemini AI
             </p>
             <p>
-              This app generates real recipes using Google's Gemini 2.0 Flash
+              This app generates real recipes using Google's Gemini Flash
               model.
             </p>
           </div>
