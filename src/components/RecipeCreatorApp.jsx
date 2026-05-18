@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { ChefHat, Plus, X, Loader2, Clock, Users } from "lucide-react";
 
 const RecipeCreatorApp = () => {
@@ -7,6 +7,9 @@ const RecipeCreatorApp = () => {
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Rate-limiting lock: prevents rapid multi-clicks from draining your API quota
+  const isFetching = useRef(false);
 
   const addIngredient = () => {
     if (
@@ -23,124 +26,118 @@ const RecipeCreatorApp = () => {
   };
 
   const generateRecipe = async () => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-  if (!apiKey) {
-    setError("Gemini API key is missing. Please set it in the .env file.");
-    return;
-  }
-
-  if (ingredients.length === 0) {
-    setError("Please add at least one ingredient");
-    return;
-  }
-
-  setLoading(true);
-  setError("");
-
-  try {
-    const prompt = `Create a delicious and practical recipe using primarily these ingredients: ${ingredients.join(
-      ", "
-    )}. Make it a realistic, delicious recipe that highlights the provided ingredients. Include common pantry staples with proper measurements. Provide clear, detailed cooking instructions.`;
-
-    // Change the endpoint to the explicit gemini-2.0-flash model
-   const response = await fetch(
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-goog-api-key": apiKey,
-    },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            // 2.0-flash respects this token limit perfectly
-            maxOutputTokens: 2048, 
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "object",
-              properties: {
-                title: { type: "string" },
-                description: { type: "string" },
-                prep_time: { type: "string" },
-                cook_time: { type: "string" },
-                servings: { type: "string" },
-                ingredients: {
-                  type: "array",
-                  items: { type: "string" }
-                },
-                instructions: {
-                  type: "array",
-                  items: { type: "string" }
-                }
-              },
-              required: ["title", "description", "prep_time", "cook_time", "servings", "ingredients", "instructions"]
-            }
-          },
-          safetySettings: [
-            {
-              category: "HARM_CATEGORY_HARASSMENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE",
-            },
-            {
-              category: "HARM_CATEGORY_HATE_SPEECH",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE",
-            },
-          ],
-        }),
-      }
-    );
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      if (response.status === 400) {
-        throw new Error(`Invalid request: ${errorData.error?.message || "Check API configuration."}`);
-      } else if (response.status === 403) {
-        throw new Error("API key access denied.");
-      } else if (response.status === 429) {
-        throw new Error("Rate limit exceeded.");
-      }
-      throw new Error(
-        `API Error: ${response.status} - ${
-          errorData.error?.message || "Unknown error"
-        }`
-      );
+    if (!apiKey) {
+      setError("Gemini API key is missing. Please set it in the .env file.");
+      return;
     }
 
-    const data = await response.json();
-    const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!generatedText) {
-      throw new Error("Empty response received from AI.");
+    if (ingredients.length === 0) {
+      setError("Please add at least one ingredient");
+      return;
     }
 
-    let parsedRecipe;
+    // Safety Gate: Exit immediately if a request is already running
+    if (isFetching.current) return;
+
+    isFetching.current = true;
+    setLoading(true);
+    setError("");
+
     try {
-      parsedRecipe = JSON.parse(generatedText.trim());
-    } catch (parseError) {
-      console.error("JSON parsing failed structure inspection. Raw text:", generatedText);
-      throw new Error("Failed to parse recipe from AI response.");
-    }
+      const prompt = `Create a delicious and practical recipe using primarily these ingredients: ${ingredients.join(
+        ", "
+      )}. Make it a realistic, delicious recipe that highlights the provided ingredients. Include common pantry staples with proper measurements. Provide clear, detailed cooking instructions.`;
 
-    setRecipe(parsedRecipe);
-  } catch (err) {
-    console.error("Recipe generation error:", err);
-    setError(err.message || "Failed to generate recipe.");
-  } finally {
-    setLoading(false);
-  }
-};
-  
+      // Using gemini-2.5-flash which provides the highest baseline limits on the free tier
+      const response = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-goog-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 2048, // Generous token ceiling so structural JSON never truncates
+              responseMimeType: "application/json",
+              // Lowercase type identifiers matching exact OpenAPI REST conventions
+              responseSchema: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  prep_time: { type: "string" },
+                  cook_time: { type: "string" },
+                  servings: { type: "string" },
+                  ingredients: {
+                    type: "array",
+                    items: { type: "string" }
+                  },
+                  instructions: {
+                    type: "array",
+                    items: { type: "string" }
+                  }
+                },
+                required: ["title", "description", "prep_time", "cook_time", "servings", "ingredients", "instructions"]
+              }
+            }
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error("Rate limit exceeded. Google is throttling requests. Please wait 30 seconds before trying again.");
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `API Error: ${response.status} - ${
+            errorData.error?.message || "Unknown error"
+          }`
+        );
+      }
+
+      const data = await response.json();
+      const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!generatedText) {
+        throw new Error("Empty response received from AI.");
+      }
+
+      let parsedRecipe;
+      try {
+        parsedRecipe = JSON.parse(generatedText.trim());
+      } catch (parseError) {
+        console.error("JSON parsing failed structure inspection. Raw text:", generatedText);
+        throw new Error("Failed to parse recipe from AI response due to structural truncation.");
+      }
+
+      setRecipe(parsedRecipe);
+    } catch (err) {
+      console.error("Recipe generation error:", err);
+      setError(err.message || "Failed to generate recipe.");
+    } finaly {
+      // Release the lock unconditionally when the cycle concludes
+      setLoading(false);
+      isFetching.current = false;
+    }
+  };
+
   const resetApp = () => {
     setIngredients([]);
     setRecipe(null);
@@ -209,7 +206,7 @@ const RecipeCreatorApp = () => {
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg text-red-700">
+              <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg text-red-700 text-sm">
                 {error}
               </div>
             )}
@@ -218,7 +215,7 @@ const RecipeCreatorApp = () => {
               <button
                 onClick={generateRecipe}
                 disabled={loading || ingredients.length === 0}
-                className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center font-medium"
               >
                 {loading ? (
                   <>
@@ -232,7 +229,7 @@ const RecipeCreatorApp = () => {
 
               <button
                 onClick={resetApp}
-                className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
               >
                 Reset
               </button>
@@ -251,19 +248,19 @@ const RecipeCreatorApp = () => {
                   <h3 className="text-xl font-bold text-gray-800 mb-2">
                     {recipe.title}
                   </h3>
-                  <p className="text-gray-600 mb-4">{recipe.description}</p>
+                  <p className="text-gray-600 mb-4 text-sm leading-relaxed">{recipe.description}</p>
 
-                  <div className="flex gap-4 mb-4 text-sm text-gray-600">
+                  <div className="flex gap-4 mb-4 text-sm text-gray-600 border-y border-gray-100 py-2">
                     <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-1" />
+                      <Clock className="h-4 w-4 mr-1 text-orange-500" />
                       Prep: {recipe.prep_time}
                     </div>
                     <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-1" />
+                      <Clock className="h-4 w-4 mr-1 text-orange-500" />
                       Cook: {recipe.cook_time}
                     </div>
                     <div className="flex items-center">
-                      <Users className="h-4 w-4 mr-1" />
+                      <Users className="h-4 w-4 mr-1 text-orange-500" />
                       Serves: {recipe.servings}
                     </div>
                   </div>
@@ -273,9 +270,9 @@ const RecipeCreatorApp = () => {
                   <h4 className="font-semibold text-gray-800 mb-2">
                     Ingredients:
                   </h4>
-                  <ul className="space-y-1">
+                  <ul className="space-y-1 pl-1">
                     {recipe.ingredients?.map((ingredient, index) => (
-                      <li key={index} className="text-gray-700">
+                      <li key={index} className="text-gray-700 text-sm">
                         • {ingredient}
                       </li>
                     ))}
@@ -286,28 +283,28 @@ const RecipeCreatorApp = () => {
                   <h4 className="font-semibold text-gray-800 mb-2">
                     Instructions:
                   </h4>
-                  <ol className="space-y-2">
+                  <ol className="space-y-2.5 pl-1">
                     {recipe.instructions?.map((instruction, index) => (
-                      <li key={index} className="text-gray-700">
-                        <span className="font-medium text-orange-600">
+                      <li key={index} className="text-gray-700 text-sm alignment-top flex gap-2">
+                        <span className="font-bold text-orange-600 min-w-[18px]">
                           {index + 1}.
                         </span>{" "}
-                        {instruction}
+                        <span className="flex-1 leading-normal">{instruction}</span>
                       </li>
                     ))}
                   </ol>
                 </div>
 
                 <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-700">
-                    ✨ Recipe generated by Gemini AI based on your ingredients!
+                  <p className="text-xs text-green-700 font-medium">
+                    ✨ Recipe generated safely by Gemini AI based on your ingredients!
                   </p>
                 </div>
               </div>
             ) : (
               <div className="text-center py-12">
                 <ChefHat className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg">
+                <p className="text-gray-500 text-base">
                   Add ingredients and click "Generate Recipe" to see your
                   AI-created recipe here!
                 </p>
@@ -318,13 +315,12 @@ const RecipeCreatorApp = () => {
 
         {/* Footer Info */}
         <div className="mt-8 text-center">
-          <div className="bg-gray-100 rounded-lg p-4 text-sm text-gray-600">
-            <p className="font-medium text-gray-800 mb-1">
-              Powered by Google Gemini AI
+          <div className="bg-gray-100 rounded-lg p-4 text-xs text-gray-500">
+            <p className="font-semibold text-gray-700 mb-1">
+              Powered by Google Gemini Developer API
             </p>
             <p>
-              This app generates real recipes using Google's Gemini Flash
-              model.
+              Optimized using the Gemini 2.5 Flash execution pipeline to avoid truncation anomalies.
             </p>
           </div>
         </div>
