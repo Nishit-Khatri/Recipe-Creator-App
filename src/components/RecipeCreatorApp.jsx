@@ -44,14 +44,14 @@ const RecipeCreatorApp = () => {
     )}. Make it a realistic, delicious recipe that highlights the provided ingredients. Include common pantry staples with proper measurements. Provide clear, detailed cooking instructions.`;
 
     // Change the endpoint to the explicit gemini-2.0-flash model
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-goog-api-key": apiKey,
-        },
+   const response = await fetch(
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-goog-api-key": apiKey,
+    },
         body: JSON.stringify({
           contents: [
             {
