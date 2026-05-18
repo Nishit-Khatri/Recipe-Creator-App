@@ -43,8 +43,9 @@ const RecipeCreatorApp = () => {
       ", "
     )}. Make it a realistic, delicious recipe that highlights the provided ingredients. Include common pantry staples with proper measurements. Provide clear, detailed cooking instructions.`;
 
+    // Change the endpoint to the explicit gemini-2.0-flash model
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
       {
         method: "POST",
         headers: {
@@ -63,11 +64,9 @@ const RecipeCreatorApp = () => {
           ],
           generationConfig: {
             temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 750,
+            // 2.0-flash respects this token limit perfectly
+            maxOutputTokens: 2048, 
             responseMimeType: "application/json",
-            // FIX: Lowercase type names are required by the direct fetch REST API
             responseSchema: {
               type: "object",
               properties: {
@@ -101,7 +100,7 @@ const RecipeCreatorApp = () => {
         }),
       }
     );
-
+    
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       if (response.status === 400) {
