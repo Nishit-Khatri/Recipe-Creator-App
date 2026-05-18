@@ -23,125 +23,124 @@ const RecipeCreatorApp = () => {
   };
 
   const generateRecipe = async () => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-    if (!apiKey) {
-      setError("Gemini API key is missing. Please set it in the .env file.");
-      return;
-    }
+  if (!apiKey) {
+    setError("Gemini API key is missing. Please set it in the .env file.");
+    return;
+  }
 
-    if (ingredients.length === 0) {
-      setError("Please add at least one ingredient");
-      return;
-    }
+  if (ingredients.length === 0) {
+    setError("Please add at least one ingredient");
+    return;
+  }
 
-    setLoading(true);
-    setError("");
+  setLoading(true);
+  setError("");
 
-    try {
-      const prompt = `Create a delicious and practical recipe using primarily these ingredients: ${ingredients.join(
-        ", "
-      )}. Make it a realistic, delicious recipe that highlights the provided ingredients. Include common pantry staples with proper measurements. Provide clear, detailed cooking instructions.`;
+  try {
+    const prompt = `Create a delicious and practical recipe using primarily these ingredients: ${ingredients.join(
+      ", "
+    )}. Make it a realistic, delicious recipe that highlights the provided ingredients. Include common pantry staples with proper measurements. Provide clear, detailed cooking instructions.`;
 
-      const response = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-goog-api-key": apiKey,
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: prompt,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 600, 
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: "OBJECT",
-                properties: {
-                  title: { type: "STRING" },
-                  description: { type: "STRING" },
-                  prep_time: { type: "STRING" },
-                  cook_time: { type: "STRING" },
-                  servings: { type: "STRING" },
-                  ingredients: {
-                    type: "ARRAY",
-                    items: { type: "STRING" }
-                  },
-                  instructions: {
-                    type: "ARRAY",
-                    items: { type: "STRING" }
-                  }
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt,
                 },
-                required: ["title", "description", "prep_time", "cook_time", "servings", "ingredients", "instructions"]
-              }
+              ],
             },
-            safetySettings: [
-              {
-                category: "HARM_CATEGORY_HARASSMENT",
-                threshold: "BLOCK_MEDIUM_AND_ABOVE",
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 750,
+            responseMimeType: "application/json",
+            // FIX: Lowercase type names are required by the direct fetch REST API
+            responseSchema: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                description: { type: "string" },
+                prep_time: { type: "string" },
+                cook_time: { type: "string" },
+                servings: { type: "string" },
+                ingredients: {
+                  type: "array",
+                  items: { type: "string" }
+                },
+                instructions: {
+                  type: "array",
+                  items: { type: "string" }
+                }
               },
-              {
-                category: "HARM_CATEGORY_HATE_SPEECH",
-                threshold: "BLOCK_MEDIUM_AND_ABOVE",
-              },
-            ],
-          }),
-        }
+              required: ["title", "description", "prep_time", "cook_time", "servings", "ingredients", "instructions"]
+            }
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE",
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE",
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      if (response.status === 400) {
+        throw new Error(`Invalid request: ${errorData.error?.message || "Check API configuration."}`);
+      } else if (response.status === 403) {
+        throw new Error("API key access denied.");
+      } else if (response.status === 429) {
+        throw new Error("Rate limit exceeded.");
+      }
+      throw new Error(
+        `API Error: ${response.status} - ${
+          errorData.error?.message || "Unknown error"
+        }`
       );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (response.status === 400) {
-          throw new Error("Invalid API key or request.");
-        } else if (response.status === 403) {
-          throw new Error("API key access denied.");
-        } else if (response.status === 429) {
-          throw new Error("Rate limit exceeded.");
-        }
-        throw new Error(
-          `API Error: ${response.status} - ${
-            errorData.error?.message || "Unknown error"
-          }`
-        );
-      }
-
-      const data = await response.json();
-      const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!generatedText) {
-        throw new Error("Empty response received from AI.");
-      }
-
-      let parsedRecipe;
-      try {
-       
-        parsedRecipe = JSON.parse(generatedText.trim());
-      } catch (parseError) {
-        console.error("JSON parsing failed:", parseError);
-        console.log("Raw response text was:", generatedText);
-        throw new Error("Failed to parse recipe from AI response.");
-      }
-
-      setRecipe(parsedRecipe);
-    } catch (err) {
-      console.error("Recipe generation error:", err);
-      setError(err.message || "Failed to generate recipe.");
-    } finally {
-      setLoading(false);
     }
-  };
+
+    const data = await response.json();
+    const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!generatedText) {
+      throw new Error("Empty response received from AI.");
+    }
+
+    let parsedRecipe;
+    try {
+      parsedRecipe = JSON.parse(generatedText.trim());
+    } catch (parseError) {
+      console.error("JSON parsing failed structure inspection. Raw text:", generatedText);
+      throw new Error("Failed to parse recipe from AI response.");
+    }
+
+    setRecipe(parsedRecipe);
+  } catch (err) {
+    console.error("Recipe generation error:", err);
+    setError(err.message || "Failed to generate recipe.");
+  } finally {
+    setLoading(false);
+  }
+};
   
   const resetApp = () => {
     setIngredients([]);
