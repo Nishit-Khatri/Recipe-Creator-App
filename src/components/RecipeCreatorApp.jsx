@@ -41,36 +41,15 @@ const RecipeCreatorApp = () => {
     try {
       const prompt = `Create a delicious and practical recipe using primarily these ingredients: ${ingredients.join(
         ", "
-      )}.
+      )}. Make it a realistic, delicious recipe that highlights the provided ingredients. Include common pantry staples with proper measurements. Provide clear, detailed cooking instructions.`;
 
-You must respond with ONLY a valid JSON object in this exact format (no markdown, no extra text):
-{
-  "title": "Recipe Name",
-  "description": "Brief appetizing description (2-3 sentences)",
-  "prep_time": "X minutes",
-  "cook_time": "X minutes", 
-  "servings": "X",
-  "ingredients": [
-    "specific ingredient with measurements",
-    "another ingredient with measurements"
-  ],
-  "instructions": [
-    "Detailed step 1 with specific actions",
-    "Detailed step 2 with cooking technique",
-    "Detailed step 3 with timing and temperature"
-  ]
-}
-
-Make it a realistic, delicious recipe that highlights the provided ingredients. Include common pantry staples with proper measurements. Provide clear, detailed cooking instructions.`;
-
-      // Updated API URL and Header authorization structure
       const response = await fetch(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-goog-api-key": apiKey, 
+            "X-goog-api-key": apiKey,
           },
           body: JSON.stringify({
             contents: [
@@ -86,7 +65,27 @@ Make it a realistic, delicious recipe that highlights the provided ingredients. 
               temperature: 0.7,
               topK: 40,
               topP: 0.95,
-              maxOutputTokens: 500,
+              maxOutputTokens: 600, 
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  title: { type: "STRING" },
+                  description: { type: "STRING" },
+                  prep_time: { type: "STRING" },
+                  cook_time: { type: "STRING" },
+                  servings: { type: "STRING" },
+                  ingredients: {
+                    type: "ARRAY",
+                    items: { type: "STRING" }
+                  },
+                  instructions: {
+                    type: "ARRAY",
+                    items: { type: "STRING" }
+                  }
+                },
+                required: ["title", "description", "prep_time", "cook_time", "servings", "ingredients", "instructions"]
+              }
             },
             safetySettings: [
               {
@@ -121,25 +120,17 @@ Make it a realistic, delicious recipe that highlights the provided ingredients. 
       const data = await response.json();
       const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
+      if (!generatedText) {
+        throw new Error("Empty response received from AI.");
+      }
+
       let parsedRecipe;
       try {
-        const cleanedText = generatedText
-          .replace(/```json\n?|\n?```/g, "")
-          .replace(/```\n?|\n?```/g, "")
-          .trim();
-
-        parsedRecipe = JSON.parse(cleanedText);
-
-        if (
-          !parsedRecipe.title ||
-          !parsedRecipe.ingredients ||
-          !parsedRecipe.instructions
-        ) {
-          throw new Error("Incomplete recipe data");
-        }
+       
+        parsedRecipe = JSON.parse(generatedText.trim());
       } catch (parseError) {
         console.error("JSON parsing failed:", parseError);
-        console.log("Raw response:", generatedText);
+        console.log("Raw response text was:", generatedText);
         throw new Error("Failed to parse recipe from AI response.");
       }
 
@@ -151,7 +142,7 @@ Make it a realistic, delicious recipe that highlights the provided ingredients. 
       setLoading(false);
     }
   };
-
+  
   const resetApp = () => {
     setIngredients([]);
     setRecipe(null);
