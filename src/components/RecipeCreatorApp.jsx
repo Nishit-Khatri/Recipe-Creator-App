@@ -131,7 +131,7 @@ const RecipeCreatorApp = () => {
     } catch (err) {
       console.error("Recipe generation error:", err);
       setError(err.message || "Failed to generate recipe.");
-    } finaly {
+    } finally {
       // Release the lock unconditionally when the cycle concludes
       setLoading(false);
       isFetching.current = false;
